@@ -2,6 +2,6 @@
 
 ## Languages
 
-[English](KnitChartGenerator/README-en.md)
+[English](README-en.md)
 
-[日本語](KnitChartGenerator/README-ja.md)
+[日本語](README-jp.md)
