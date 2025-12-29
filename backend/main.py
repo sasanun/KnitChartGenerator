@@ -123,8 +123,25 @@ class Metric(str, Enum):
 class Gauge(BaseModel):
     """ ゲージの幅と高さを表現するクラス """
     metric: Metric = Field(default=Metric.CM, description="寸法の単位")
-    height: float = Field(..., description="ゲージの段数", gt=0)
-    width: float = Field(..., description="ゲージの目数", gt=0)
+    vertical: float = Field(..., description="ゲージの段数", gt=0)
+    horizontal: float = Field(..., description="ゲージの目数", gt=0)
+    @computed_field
+    @property
+    def stitch_width(self):
+        if self.metric == Metric.INCH:
+            return 10.16 / self.horizontal
+        elif self.metric == Metric.CM:
+            return 10 / self.horizontal
+        return 0
+    
+    @computed_field
+    @property
+    def stitch_length(self):
+        if self.metric == Metric.INCH:
+            return 10.16 / self.vertical
+        elif self.metric == Metric.CM:
+            return 10 / self.vertical
+        return 0
 
 # POSTで受け取るデータを表現するクラス Pydantic Model
 class SweaterDimensions(BaseModel):
@@ -156,8 +173,8 @@ class SweaterDimensions(BaseModel):
     def __str__(self) -> str:
         lines = [
             f"SweaterDimensions:",
-            f"gauge_height: {self.gauge.height}",
-            f"gauge_width: {self.gauge.width}",
+            f"gauge_height: {self.gauge.vertical}",
+            f"gauge_width: {self.gauge.horizontal}",
             "",
             f"length_of_body: {self.length_of_body}",
             f"length_of_shoulder_drop: {self.length_of_shoulder_drop}",
@@ -178,8 +195,8 @@ class SweaterDimensions(BaseModel):
             "",
             f"is_odd: {self.is_odd}",
             "",
-            f"stitch_width: {self.stitch_width}",
-            f"stitch_length: {self.stitch_length}",
+            f"stitch_width: {self.gauge.stitch_width}",
+            f"stitch_length: {self.gauge.stitch_length}",
             "",
             f"length_of_body_side: {self.length_of_body_side}",
             f"length_of_vertical_armhole: {self.length_of_vertical_armhole}",
@@ -194,18 +211,6 @@ class SweaterDimensions(BaseModel):
 
     @computed_field
     @property
-    def stitch_width(self) -> float:
-        """ ゲージから1目の幅"""
-        return math.ceil(100000 / self.gauge.width) / 1000
-
-    @computed_field
-    @property
-    def stitch_length(self) -> float:
-        """ ゲージから1目の高さ"""
-        return math.ceil(100000 / self.gauge.height) / 1000
-
-    @computed_field
-    @property
     def length_of_body_side(self) -> float:
         """ 脇下から裾のゴム編みの上端までの長さ"""
         return self.length_of_body - self.length_of_shoulder_drop - self.length_of_vertical_armhole - self.length_of_ribbed_hem
@@ -214,13 +219,13 @@ class SweaterDimensions(BaseModel):
     @property
     def length_of_vertical_armhole(self) -> float:
         """ 袖ぐりの垂直方向の長さ """
-        return int(self.width_of_sleeve / self.stitch_length) * self.stitch_length
+        return int(self.width_of_sleeve / self.gauge.stitch_length) * self.gauge.stitch_length
 
     @computed_field
     @property
     def width_of_horizontal_armhole(self) -> float:
         """ 袖ぐりの水平方向の長さ 身幅の1/10"""
-        return int((self.width_of_body * 0.1) / self.stitch_width) * self.stitch_width
+        return int((self.width_of_body * 0.1) / self.gauge.stitch_width) * self.gauge.stitch_width
 
     @computed_field
     @property
@@ -232,7 +237,7 @@ class SweaterDimensions(BaseModel):
     @property
     def length_of_sleeve_cap(self) -> float:
         """ 袖山の高さ(mm) 袖ぐりの水平方向の長さの2倍"""
-        return int((self.width_of_horizontal_armhole * 2) / self.stitch_length) * self.stitch_length
+        return int((self.width_of_horizontal_armhole * 2) / self.gauge.stitch_length) * self.gauge.stitch_length
 
     @computed_field
     @property
@@ -244,123 +249,123 @@ class SweaterDimensions(BaseModel):
     @property
     def rows_of_body(self) -> int:
         """ 着丈の段数"""
-        return int(self.length_of_body / self.stitch_length)
+        return int(self.length_of_body / self.gauge.stitch_length)
     
     @computed_field
     @property
     def rows_of_shoulder_drop(self) -> int:
         """ 肩下がりの段数"""
-        return int(self.length_of_shoulder_drop / self.stitch_length)
+        return int(self.length_of_shoulder_drop / self.gauge.stitch_length)
     
     @computed_field
     @property
     def rows_of_ribbed_hem(self) -> int:
         """ 裾のゴム編みの段数"""
-        return int(self.length_of_ribbed_hem / self.stitch_length)
+        return int(self.length_of_ribbed_hem / self.gauge.stitch_length)
     
     @computed_field
     @property
     def rows_of_front_neck_drop(self) -> int:
         """ 前襟ぐり下がりの段数"""
-        return int(self.length_of_front_neck_drop / self.stitch_length)
+        return int(self.length_of_front_neck_drop / self.gauge.stitch_length)
     
     @computed_field
     @property
     def rows_of_back_neck_drop(self) -> int:
         """ 後襟ぐり下がりの段数"""
-        return int(self.length_of_back_neck_drop / self.stitch_length)
+        return int(self.length_of_back_neck_drop / self.gauge.stitch_length)
     
     @computed_field
     @property
     def cols_of_body(self) -> int:
         """ 身幅の目数"""
-        return int(self.width_of_body / self.stitch_width)
+        return int(self.width_of_body / self.gauge.stitch_width)
     
     @computed_field
     @property
     def cols_of_neck(self) -> int:
         """ 襟ぐり幅の目数"""
-        return int(self.width_of_neck / self.stitch_width)
+        return int(self.width_of_neck / self.gauge.stitch_width)
     
     @computed_field
     @property
     def rows_of_sleeve(self) -> int:
         """ 袖丈の段数"""
-        return int(self.length_of_sleeve / self.stitch_length)
+        return int(self.length_of_sleeve / self.gauge.stitch_length)
     
     @computed_field
     @property
     def rows_of_ribbed_cuff(self) -> int:
         """ 袖口のゴム編みの段数"""
-        return int(self.length_of_ribbed_cuff / self.stitch_length)
+        return int(self.length_of_ribbed_cuff / self.gauge.stitch_length)
     
     @computed_field
     @property
     def cols_of_sleeve(self) -> int:
         """ 袖幅の目数"""
-        return int(self.width_of_sleeve / self.stitch_width)
+        return int(self.width_of_sleeve / self.gauge.stitch_width)
     
     @computed_field
     @property
     def cols_of_cuff(self) -> int:
         """ 袖口幅の目数"""
-        return int(self.width_of_cuff / self.stitch_width)
+        return int(self.width_of_cuff / self.gauge.stitch_width)
     
     @computed_field
     @property
     def rows_of_body_side(self) -> int:
         """ 脇下から裾のゴム編みの上端までの段数"""
-        return int(self.length_of_body_side / self.stitch_length)
+        return int(self.length_of_body_side / self.gauge.stitch_length)
     
     @computed_field
     @property
     def rows_of_vertical_armhole(self) -> int:
         """ 袖ぐりの垂直方向の段数"""
-        return int(self.length_of_vertical_armhole / self.stitch_length)
+        return int(self.length_of_vertical_armhole / self.gauge.stitch_length)
     
     @computed_field
     @property
     def cols_of_horizontal_armhole(self) -> int:
         """ 袖ぐりの水平方向の目数"""
-        return int(self.width_of_horizontal_armhole / self.stitch_width)
+        return int(self.width_of_horizontal_armhole / self.gauge.stitch_width)
     
     @computed_field
     @property
     def cols_of_shoulder(self) -> int:
         """ 肩幅の目数"""
-        return int(self.width_of_shoulder / self.stitch_width)
+        return int(self.width_of_shoulder / self.gauge.stitch_width)
     
     @computed_field
     @property
     def rows_of_sleeve_side(self) -> int:
         """ 袖下から袖山の高さまでの段数"""
-        return int(self.length_of_sleeve_side / self.stitch_length)
+        return int(self.length_of_sleeve_side / self.gauge.stitch_length)
     
     @computed_field
     @property
     def rows_of_sleeve_cap(self) -> int:
         """ 袖山の段数"""
-        return int(self.length_of_sleeve_cap / self.stitch_length)
+        return int(self.length_of_sleeve_cap / self.gauge.stitch_length)
 
     def _round_to_multiple_stitch_length(self, value) -> float:
         """ 寸法を stitch_length の整数倍に丸める"""
-        return int(value / self.stitch_length) * self.stitch_length
+        return int(value / self.gauge.stitch_length) * self.gauge.stitch_length
 
     def _round_to_multiple_stitch_width(self, value) -> float:
         """ 寸法を stitch_width の整数倍に丸める"""
-        return int(value / self.stitch_width) * self.stitch_width
+        return int(value / self.gauge.stitch_width) * self.gauge.stitch_width
 
     def _round_to_multiple_odd_or_even_stitch_width(self, value) -> float:
         """ 寸法を stitch_width の奇数倍または偶数倍に丸める"""
         if self.is_odd:
-            return int(value / self.stitch_width / 2) * 2 * self.stitch_width + self.stitch_width
+            return int(value / self.gauge.stitch_width / 2) * 2 * self.gauge.stitch_width + self.gauge.stitch_width
         else:
-            return int(value / self.stitch_width / 2) * 2 * self.stitch_width
+            return int(value / self.gauge.stitch_width / 2) * 2 * self.gauge.stitch_width
 
     def _round_to_multiple_odd_or_even_stitch_width_half(self, value) -> float:
         """ 寸法を stitch_width の(整数+1/2)倍または整数倍に丸める"""
         if self.is_odd:
-            return self._round_to_multiple_stitch_width(value) + self.stitch_width / 2
+            return self._round_to_multiple_stitch_width(value) + self.gauge.stitch_width / 2
         else:
             return self._round_to_multiple_stitch_width(value)
 
@@ -469,10 +474,10 @@ class Shape:
             
 
         # 肩の水平な直線の長さ
-        stitch_num_of_shoulder_drop = int(data.length_of_shoulder_drop / data.stitch_length)
-        stitch_num_of_shoulder_width = int(data.width_of_shoulder / data.stitch_width)
+        stitch_num_of_shoulder_drop = int(data.length_of_shoulder_drop / data.gauge.stitch_length)
+        stitch_num_of_shoulder_width = int(data.width_of_shoulder / data.gauge.stitch_width)
         stitch_num_of_horizonal_shoulder_line = int((stitch_num_of_shoulder_width / stitch_num_of_shoulder_drop)/2)
-        horizonal_shoulder_line_width = stitch_num_of_horizonal_shoulder_line * data.stitch_width
+        horizonal_shoulder_line_width = stitch_num_of_horizonal_shoulder_line * data.gauge.stitch_width
 
         # 身頃のパス
         path = parse_path(
@@ -562,14 +567,6 @@ class Shape:
         )
 
         return cls(path, data.gauge)
-
-    @property
-    def stitch_width(self):
-        return self._stitch_width
-
-    @property
-    def stitch_length(self):
-        return self._stitch_length
     
     def write_svg(self, filename: str, **kwargs):
         wsvg(self.path, filename=filename, **kwargs)
@@ -584,7 +581,7 @@ class Chart:
     def __getattr__(self, name):
         # クラスにないものはnp.ndarrayに投げる
         return getattr(self.array, name)
-
+    
     @classmethod
     def from_shape(cls, shape: Shape) -> 'Chart':
         """
@@ -614,8 +611,8 @@ class Chart:
         height = end_y - start_y
 
         # グリッドの縦横の数を計算する
-        num_grid_width = int(width / shape.stitch_width)
-        num_grid_height = int(height / (shape.stitch_length))
+        num_grid_width = int(width / shape.gauge.stitch_width)
+        num_grid_height = int(height / (shape.gauge.stitch_length))
         num_grid_width_half = int(num_grid_width / 2) #対称軸の位置
 
         logger.debug(
@@ -655,10 +652,10 @@ class Chart:
             return Chart(array, shape.gauge)
         
         # 1目の縦横の長さに対応したグリッドの中心が内側かどうかは判定する
-        for y_index, y_coordinate in enumerate(np.arange(0, height, shape.stitch_length)):
-            for x_index, x_coordinate in enumerate(np.arange(0, width, shape.stitch_width)):
+        for y_index, y_coordinate in enumerate(np.arange(0, height, shape.gauge.stitch_length)):
+            for x_index, x_coordinate in enumerate(np.arange(0, width, shape.gauge.stitch_width)):
                 # 判定点
-                point = Point(float(x_coordinate + shape.stitch_width / 2), float(y_coordinate + shape.stitch_length / 2))
+                point = Point(float(x_coordinate + shape.gauge.stitch_width / 2), float(y_coordinate + shape.gauge.stitch_length / 2))
                 # 右側の判定点が結合された形状の内部にあるか判定
                 if polygon.contains(point):
                     # 内部にある場合、グリッドを描画
@@ -669,14 +666,6 @@ class Chart:
 
         logger.debug(f"grid_array is generated: shape{array.shape[0]} length_of_x={array.shape[1]}")
         return result
-
-    @property
-    def stitch_width(self):
-        return self._stitch_width
-
-    @property
-    def stitch_length(self):
-        return self._stitch_length
 
     def _insert_symbol(self) -> np.ndarray:
         """
@@ -1067,8 +1056,8 @@ def generate_file(data: SweaterDimensions) -> str:
     back_body_chart = Chart.from_shape(back_body_shape)
     sleeve_chart = Chart.from_shape(sleeve_shape)
 
-    start_row_of_ribbed_hem = int((data.length_of_body - data.length_of_ribbed_hem) / data.stitch_length)
-    start_row_of_ribbed_cuff = int((data.length_of_sleeve - data.length_of_ribbed_cuff) / data.stitch_length)
+    start_row_of_ribbed_hem = int((data.length_of_body - data.length_of_ribbed_hem) / data.gauge.stitch_length)
+    start_row_of_ribbed_cuff = int((data.length_of_sleeve - data.length_of_ribbed_cuff) / data.gauge.stitch_length)
 
     (
         front_body_chart
