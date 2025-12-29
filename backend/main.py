@@ -13,6 +13,7 @@ from xml.etree import ElementTree        # XML/SVG の DOM 解析
 import logging                           # ログ
 import asyncio                           # 非同期処理
 from enum import Enum                    # 列挙型
+from dataclasses import dataclass        # データクラス
 
 # ============================
 # サードパーティライブラリ
@@ -49,6 +50,7 @@ from fastapi.responses import(
     FileResponse,
     JSONResponse,
 )
+import openpyxl
 
 # ロガーの初期化
 logging.basicConfig(
@@ -96,33 +98,40 @@ class Symbol(Enum):
         return cls.NONE
 
 # セーターの形状のEnum
-class BodyType(str, Enum):
-    STANDARD = "standard"
-    # CARDIGAN = "cardigan"
-    # VEST = "vest"
-    
+class SweaterType(str, Enum):
+    CREW_NECK_SWEATER = "crew-neck-sweater"
+    V_NECK_SWEATER = "v-neck-sweater"
+    BOX_SWEATER = "box-sweater"
+    TURTLENECK_SWEATER = "turtleneck"
 
-class NeckType(str, Enum):
-    CREW_NECK = "crew-Neck"
-    # V_NECK = "v-neck"
-    # TURTLENECK = "turtleneck"
+    CREW_NECK_CARDIGAN = "crew-neck-cardigan"
+    V_NECK_CARDIGAN = "v-neck-cardigan"
+    BOX_CARDIGAN = "box-cardigan"
 
-class ShoulderType(str, Enum):
-    STANDARD = "standard"
-    # BOX = "box"
-    # RAGLAN = "raglan"
+    CREW_NECK_VEST = "crew-neck-vest"
+    V_NECK_VEST = "v-neck-vest"
+    BOX_VEST = "box-vest"
 
-class Side(str, Enum):
-    RIGHT = "right"
-    LEFT = "left"
+    PO_CREW_NECK_VEST = "po-crew-neck-vest"
+    PO_V_NECK_VEST = "po-v-neck-vest"
+    PO_BOX_VEST = "po-box-vest"
+
+class Metric(str, Enum):
+    INCH = "inch"
+    CM = "cm"
+
+class Gauge(BaseModel):
+    """ ゲージの幅と高さを表現するクラス """
+    metric: Metric = Field(default=Metric.CM, description="寸法の単位")
+    height: float = Field(..., description="ゲージの段数", gt=0)
+    width: float = Field(..., description="ゲージの目数", gt=0)
 
 # POSTで受け取るデータを表現するクラス Pydantic Model
 class SweaterDimensions(BaseModel):
     """
     長袖のセーターの寸法とゲージを定義するデータモデル
     """
-    gauge_height: float = Field(..., description="ゲージの段数", gt=0)
-    gauge_width: float = Field(..., description="ゲージの目数", gt=0)
+    gauge: Gauge = Field(..., description="ゲージ")
 
     length_of_body: float = Field(..., description="着丈", gt=0)
     length_of_shoulder_drop: float = Field(..., description="肩下がり", gt=0)
@@ -140,17 +149,15 @@ class SweaterDimensions(BaseModel):
     width_of_sleeve: float = Field(..., description="袖幅", gt=0)
     width_of_cuff: float = Field(..., description="袖口幅", gt=0)
 
-    body_shape_type: BodyType = Field(..., description="身頃の形状")
-    neck_shape_type: NeckType = Field(..., description="襟の形状")
-    shoulder_shape_type: ShoulderType = Field(..., description="肩の形状")
+    type: SweaterType = Field(..., description="セーターの形状")
 
-    is_odd: bool = Field(..., description="水平方向の目数を奇数にする")
+    is_odd: bool = Field(default=False, description="水平方向の目数を奇数にする")
 
     def __str__(self) -> str:
         lines = [
             f"SweaterDimensions:",
-            f"gauge_height: {self.gauge_height}",
-            f"gauge_width: {self.gauge_width}",
+            f"gauge_height: {self.gauge.height}",
+            f"gauge_width: {self.gauge.width}",
             "",
             f"length_of_body: {self.length_of_body}",
             f"length_of_shoulder_drop: {self.length_of_shoulder_drop}",
@@ -167,9 +174,7 @@ class SweaterDimensions(BaseModel):
             f"width_of_sleeve: {self.width_of_sleeve}",
             f"width_of_cuff: {self.width_of_cuff}",
             "",
-            f"body_shape_type: {self.body_shape_type}",
-            f"neck_shape_type: {self.neck_shape_type}",
-            f"shoulder_shape_type: {self.shoulder_shape_type}",
+            f"type: {self.type}",
             "",
             f"is_odd: {self.is_odd}",
             "",
@@ -191,13 +196,13 @@ class SweaterDimensions(BaseModel):
     @property
     def stitch_width(self) -> float:
         """ ゲージから1目の幅"""
-        return math.ceil(100000 / self.gauge_width) / 1000
+        return math.ceil(100000 / self.gauge.width) / 1000
 
     @computed_field
     @property
     def stitch_length(self) -> float:
         """ ゲージから1目の高さ"""
-        return math.ceil(100000 / self.gauge_height) / 1000
+        return math.ceil(100000 / self.gauge.height) / 1000
 
     @computed_field
     @property
@@ -426,10 +431,9 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
 
 # シェイプ（型紙）
 class Shape:
-    def __init__(self, path: Path, stitch_width: float, stitch_length: float):
+    def __init__(self, path: Path, gauge: Gauge):
         self.path = path
-        self._stitch_width = stitch_width
-        self._stitch_length = stitch_length
+        self.gauge = gauge
 
     def __getattr__(self, name):
         # クラスにないものは Path に投げる
@@ -515,7 +519,7 @@ class Shape:
             f"Z"
         )
         
-        return cls(path, data.stitch_width, data.stitch_length)
+        return cls(path, data.gauge)
 
     @classmethod
     def sleeve_from(cls, data: SweaterDimensions) -> 'Shape':
@@ -557,7 +561,7 @@ class Shape:
             f"Z"
         )
 
-        return cls(path, data.stitch_width, data.stitch_length)
+        return cls(path, data.gauge)
 
     @property
     def stitch_width(self):
@@ -573,10 +577,9 @@ class Shape:
 
 # チャート（編み図）
 class Chart:
-    def __init__(self, array: np.ndarray, stitch_width: float, stitch_length: float):
+    def __init__(self, array: np.ndarray, gauge: Gauge):
         self.array = array
-        self._stitch_width = stitch_width
-        self._stitch_length = stitch_length
+        self.gauge = gauge
 
     def __getattr__(self, name):
         # クラスにないものはnp.ndarrayに投げる
@@ -623,7 +626,7 @@ class Chart:
         )
 
         # グリッドと同じ行列数の配列を生成
-        result = np.zeros((num_grid_height, num_grid_width), dtype=np.int8)
+        array = np.zeros((num_grid_height, num_grid_width), dtype=np.int8)
         logger.debug(f"grid_array is created")
 
         # パス要素からポリゴンを生成
@@ -649,7 +652,7 @@ class Chart:
         if not polygon:
             # 形状が一つも抽出されなかった場合
             logger.warning(f"No polygon could be created from the shape path. Returning empty chart.")
-            return Chart(result, shape.stitch_width, shape.stitch_length)
+            return Chart(array, shape.gauge)
         
         # 1目の縦横の長さに対応したグリッドの中心が内側かどうかは判定する
         for y_index, y_coordinate in enumerate(np.arange(0, height, shape.stitch_length)):
@@ -659,10 +662,13 @@ class Chart:
                 # 右側の判定点が結合された形状の内部にあるか判定
                 if polygon.contains(point):
                     # 内部にある場合、グリッドを描画
-                    result[y_index, x_index] = Symbol.KNIT.number
+                    array[y_index, x_index] = Symbol.KNIT.number
 
-        logger.debug(f"grid_array is generated: shape{result.shape[0]} length_of_x={result.shape[1]}")
-        return cls(result, shape.stitch_width, shape.stitch_length)
+        result = cls(array, shape.gauge)
+        result._insert_symbol()
+
+        logger.debug(f"grid_array is generated: shape{array.shape[0]} length_of_x={array.shape[1]}")
+        return result
 
     @property
     def stitch_width(self):
@@ -751,7 +757,7 @@ class Chart:
         # ===== 2.編み目記号を挿入する =====
 
         # 2.1 最上行にSymbol.NONEの行を追加
-        self.insert_row_to_top(fill=Symbol.NONE.number)
+        self._insert_row_to_top(fill=Symbol.NONE.number)
 
         # 2.2 伏止記号の挿入
         self._replace_in(
@@ -863,7 +869,7 @@ class Chart:
         self.array = result
         return result
     
-    def insert_row_to_top(self, fill: int) -> np.ndarray:
+    def _insert_row_to_top(self, fill: int) -> np.ndarray:
         """
         配列の先頭に fill の行を挿入する
         """
@@ -950,6 +956,45 @@ class Chart:
             fmt='%d',
             delimiter=','
         )
+
+
+class XLSX():
+    def __init__(self, xlsx: openpyxl.Workbook):
+        self._xlsx = xlsx
+
+    def __getattr__(self, name):
+        # クラスにないものはopenpyxl.Workbookに投げる
+        return getattr(self._xlsx, name)
+
+    @classmethod
+    def from_charts(cls, charts: dict[str, Chart]) -> 'XLSX':
+        # TODO
+
+        keys = np.array(list(charts.keys()))
+        num_charts = keys.shape[0]
+
+        # 先頭のチャートからゲージを取得
+        gauge = charts[keys[0]].gauge
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        if ws is None:
+            raise ValueError
+        ws.title = "info"
+
+        for i in range(num_charts):
+            chart = charts[keys[i]]
+            ws = wb.create_sheet(keys[i])
+            for row in range(chart.array.shape[0]):
+                for col in range(chart.array.shape[1]):
+                    ws.cell(row=row+1, column=col+1).value = chart.array[row, col]
+
+        if wb is None:
+            raise ValueError
+        else:
+            return cls(wb)
+        
+
     
     
 @app.post("/generate_sweater_chart", response_description="generated file")
