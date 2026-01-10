@@ -26512,7 +26512,7 @@ var $async$Hi=A.Q(function(a,b){if(a===1){p.push(b)
 s=q}for(;;)switch(s){case 0:q=3
 A.hj("\u65e5\u672c\u8a9e\u306e\u7ffb\u8a33\u30c7\u30fc\u30bf\u3092\u30ed\u30fc\u30c9\u4e2d...")
 s=6
-return A.U($.w4().I4("lang/jp.json"),$async$Hi)
+return A.U($.w4().I4("assets/lang/jp.json"),$async$Hi)
 case 6:o=b
 k=t.N
 $.arN.m(0,"ja",A.asG(B.d6.hE(o),k,k))
@@ -26531,7 +26531,7 @@ break
 case 5:q=8
 A.hj("\u82f1\u8a9e\u306e\u7ffb\u8a33\u30c7\u30fc\u30bf\u3092\u30ed\u30fc\u30c9\u4e2d...")
 s=11
-return A.U($.w4().I4("lang/en.json"),$async$Hi)
+return A.U($.w4().I4("assets/lang/en.json"),$async$Hi)
 case 11:m=b
 k=t.N
 $.arN.m(0,"en",A.asG(B.d6.hE(m),k,k))
@@ -83656,7 +83656,7 @@ var $async$x8=A.Q(function(a0,a1){if(a0===1){o.push(a1)
 s=p}for(;;)switch(s){case 0:p=4
 A.hj("YAML\u8aad\u307f\u8fbc\u307f\u958b\u59cb...")
 s=7
-return A.U($.w4().I4("data/products.yaml"),$async$x8)
+return A.U($.w4().I4("assets/data/products.yaml"),$async$x8)
 case 7:m=a1
 A.hj("\u30d5\u30a1\u30a4\u30eb\u53d6\u5f97\u6210\u529f")
 l=A.aPV(m,null,!1,null).a.gt()

@@ -14,7 +14,7 @@ class AppTranslations {
     try {
       
       print('日本語の翻訳データをロード中...');
-      String jaJson = await rootBundle.loadString('lang/jp.json');
+      String jaJson = await rootBundle.loadString('assets/lang/jp.json');
       values['ja'] = Map<String, String>.from(json.decode(jaJson));
       print('日本語の翻訳データのロード完了');
       
@@ -28,7 +28,7 @@ class AppTranslations {
     try {
       
       print('英語の翻訳データをロード中...');
-      String enJson = await rootBundle.loadString('lang/en.json');
+      String enJson = await rootBundle.loadString('assets/lang/en.json');
       values['en'] = Map<String, String>.from(json.decode(enJson));
       print('英語の翻訳データのロード完了');
       

@@ -517,7 +517,7 @@ class _SweaterInputPageState extends State<SweaterInputPage> {
   Future<void> _loadAdProducts() async {
     try {
       print("YAML読み込み開始..."); // ←確認用
-      final String yamlString = await rootBundle.loadString('data/products.yaml');
+      final String yamlString = await rootBundle.loadString('assets/data/products.yaml');
       print("ファイル取得成功"); // ←ここまで来なければパス間違い
 
       final dynamic yamlData = loadYaml(yamlString);
